@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Celestial Title Converter (Team)</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --teal:#134f5c; --gold:#ffd966; --panel:#ffffff; --muted:#64748b; --border:#e2e8f0;
+    --accent:#2563eb; --accent-dark:#1d4ed8; --good:#16a34a; --bad:#dc2626;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    background:linear-gradient(180deg,#0f172a 0%,#1e293b 260px,#f1f5f9 260px,#f1f5f9 100%);
+    color:#1e293b; padding:32px 20px 60px;
+  }
+  .wrap{max-width:1180px;margin:0 auto;}
+  #resultsCard{max-width:none;width:96vw;margin-left:50%;transform:translateX(-50%);}
+  header{color:#fff;margin-bottom:20px;display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;}
+  header h1{margin:0 0 6px;font-size:26px;}
+  header p{margin:0;color:#cbd5e1;font-size:14px;}
+  .userbox{color:#cbd5e1;font-size:13px;text-align:right;}
+  .userbox button{margin-top:6px;}
+
+  .card{background:var(--panel);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.12);padding:24px;margin-bottom:20px;}
+  .card h2{margin:0 0 14px;font-size:16px;color:#0f172a;}
+  .controls-row{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;}
+  .field{flex:1;min-width:220px;}
+  .field label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.4px;}
+  select,input[type=text],input[type=date],input[type=email]{
+    width:100%;padding:9px 10px;border-radius:8px;border:1px solid var(--border);font-size:14px;background:#fff;
+  }
+  select:focus,input:focus{outline:2px solid var(--accent);outline-offset:1px;}
+
+  #dropzone{border:2px dashed #cbd5e1;border-radius:12px;padding:34px 20px;text-align:center;cursor:pointer;transition:.15s;background:#f8fafc;}
+  #dropzone.drag{border-color:var(--accent);background:#eff6ff;}
+  #dropzone.locked{opacity:.5;cursor:not-allowed;}
+  #dropzone .icon{font-size:34px;margin-bottom:8px;}
+  #dropzone .main{font-size:15px;font-weight:600;color:#0f172a;}
+  #dropzone .sub{font-size:13px;color:var(--muted);margin-top:4px;}
+  #fileInput{display:none;}
+  .filepill{display:inline-flex;align-items:center;gap:8px;background:#eef2ff;color:#3730a3;border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600;margin-top:12px;}
+  .filepill button{border:none;background:none;color:#3730a3;cursor:pointer;font-weight:700;font-size:14px;}
+
+  .btn{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:14px;font-weight:600;cursor:pointer;transition:.15s;}
+  .btn:hover{background:var(--accent-dark);}
+  .btn:disabled{background:#cbd5e1;cursor:not-allowed;}
+  .btn.secondary{background:#f1f5f9;color:#0f172a;border:1px solid var(--border);}
+  .btn.secondary:hover{background:#e2e8f0;}
+  .btn.danger{background:#fef2f2;color:var(--bad);border:1px solid #fecaca;}
+  .btn.small{padding:6px 12px;font-size:12.5px;}
+  .btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;}
+
+  .tabs{display:flex;gap:8px;margin-bottom:16px;}
+  .tab{background:rgba(255,255,255,.12);color:#e2e8f0;border:none;border-radius:10px 10px 0 0;padding:10px 20px;font-size:14px;font-weight:600;cursor:pointer;}
+  .tab.active{background:#fff;color:#0f172a;}
+
+  .stats{display:flex;gap:14px;flex-wrap:wrap;margin:6px 0 4px;}
+  .stat{background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:12px 16px;min-width:130px;}
+  .stat .n{font-size:20px;font-weight:700;color:#0f172a;}
+  .stat .l{font-size:12px;color:var(--muted);margin-top:2px;}
+
+  .msg{padding:12px 14px;border-radius:8px;font-size:13.5px;margin-top:12px;display:none;}
+  .msg.error{background:#fef2f2;color:var(--bad);border:1px solid #fecaca;display:block;}
+  .msg.ok{background:#f0fdf4;color:var(--good);border:1px solid #bbf7d0;display:block;}
+  .msg.warn{background:#fffbeb;color:#b45309;border:1px solid #fde68a;display:block;}
+
+  table.out{border-collapse:collapse;width:100%;font-size:12.5px;margin-top:4px;}
+  table.out caption{caption-side:top;text-align:left;font-weight:700;color:#0f172a;font-size:14px;margin-bottom:6px;}
+  table.out th, table.out td{border:1px solid #cbd5e1;padding:5px 8px;white-space:nowrap;}
+  table.out thead tr.title-row th{background:var(--teal);color:#fff;font-size:14px;font-weight:700;padding:8px;text-align:center;}
+  table.out thead tr.col-row th{background:var(--teal);color:#fff;position:sticky;top:0;}
+  table.out thead tr.col-row th.accent{color:var(--gold);}
+  table.out tbody tr:nth-child(even) td.plain{background:#f8fafc;}
+  .server-block{margin-bottom:34px;overflow-x:auto;border-radius:8px;}
+  .rank-cell,.title-cell{color:#fff;font-weight:700;text-align:center;}
+
+  footer{color:#94a3b8;font-size:12px;text-align:center;margin-top:30px;}
+  .hint{font-size:12.5px;color:var(--muted);margin-top:8px;line-height:1.5;}
+  .legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+  .legend span{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:#334155;background:#f8fafc;border:1px solid var(--border);border-radius:999px;padding:4px 10px;}
+  .legend i{width:10px;height:10px;border-radius:3px;display:inline-block;}
+
+  .history-item{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;background:#f8fafc;}
+  .history-item .meta{font-size:13.5px;color:#0f172a;}
+  .history-item .sub{font-size:12px;color:var(--muted);margin-top:3px;}
+  .history-item .actions{display:flex;gap:8px;}
+  .badge{display:inline-block;background:#dbeafe;color:#1e40af;border-radius:6px;padding:2px 8px;font-size:12px;font-weight:700;margin-right:6px;}
+  .history-empty{font-size:13px;color:var(--muted);padding:8px 2px;}
+  .history-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13.5px;}
+  .hidden{display:none !important;}
+  .login-card{max-width:460px;margin:40px auto;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>🏆 Celestial Title Converter</h1>
+      <p>โยนไฟล์ Excel → แปลงเป็น Celestial Title แล้วเก็บไว้ให้ทีมเปิดดูย้อนหลังได้ 14 วัน</p>
+    </div>
+  </header>
+
+  <!-- ================= SETUP WARNING ================= -->
+  <div id="setupView" class="hidden">
+    <div class="card">
+      <h2>ยังไม่ได้ตั้งค่า Supabase</h2>
+      <div class="hint">เปิดไฟล์ <code>index.html</code> แล้วใส่ค่า <code>SUPABASE_URL</code> และ <code>SUPABASE_ANON_KEY</code> ที่ส่วน CONFIG ต้นสคริปต์ (ดูขั้นตอนใน README.md)</div>
+    </div>
+  </div>
+
+  <!-- ================= APP ================= -->
+  <div id="appView" class="hidden">
+    <div id="demoBanner" class="msg warn hidden" style="display:block;margin:0 0 16px;">
+      🧪 <b>โหมดทดลอง</b> — ยังไม่ได้เชื่อม Supabase ประวัติจะเก็บอยู่ในเบราว์เซอร์เครื่องนี้เท่านั้น (คนอื่นมองไม่เห็น) ใช้ดูหน้าตาและลองขั้นตอนทั้งหมดได้ตามปกติ
+    </div>
+    <div class="tabs">
+      <button class="tab active" id="tabConvert">📄 แปลงไฟล์ใหม่</button>
+      <button class="tab" id="tabHistory">📜 ประวัติของทีม (14 วัน)</button>
+    </div>
+
+    <!-- ---- Convert tab ---- -->
+    <div id="convertPane">
+      <div class="card">
+        <h2>1. ข้อมูลของไฟล์นี้</h2>
+        <div class="controls-row">
+          <div class="field">
+            <label for="regionPreset">Preset (เซิร์ฟเวอร์)</label>
+            <select id="regionPreset">
+              <option value="PC-SEA">Cabal PCSEA → [PC-SEA]</option>
+              <option value="CBM-SEA">Cabal MSEA → [CBM-SEA]</option>
+              <option value="CBPC-TH">Cabal PCTH → [CBPC-TH]</option>
+              <option value="CBM-TH">Cabal MTH → [CBM-TH]</option>
+              <option value="custom">กำหนดเอง (Custom)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="prefixInput">ป้ายกำกับหัวตาราง (Prefix)</label>
+            <input type="text" id="prefixInput" value="PC-SEA">
+          </div>
+          <div class="field">
+            <label for="maDate">วันที่ MA (Maintenance) ของรอบนี้ *</label>
+            <input type="date" id="maDate">
+          </div>
+          <div class="field">
+            <label for="uploaderName">ชื่อผู้ทำ (ไม่บังคับ)</label>
+            <input type="text" id="uploaderName" placeholder="เช่น พี่เป๊ะ">
+          </div>
+          <div class="field">
+            <label for="noteInput">หมายเหตุ (ไม่บังคับ)</label>
+            <input type="text" id="noteInput" placeholder="เช่น สัปดาห์ที่ 2 ของเดือน">
+          </div>
+        </div>
+        <div class="hint">ต้องเลือกวันที่ MA ก่อนจึงจะอัปโหลดไฟล์ได้ — ใช้ให้คนอื่นรู้ว่าข้อมูลนี้เป็นของเซิร์ฟเวอร์ไหน รอบ MA วันไหน</div>
+      </div>
+
+      <div class="card">
+        <h2>2. อัปโหลดไฟล์ Excel</h2>
+        <div id="dropzone" class="locked">
+          <div class="icon">📄</div>
+          <div class="main">ลากไฟล์ .xlsx มาวางตรงนี้ หรือคลิกเพื่อเลือกไฟล์</div>
+          <div class="sub">ต้องมีคอลัมน์: player_id, username, aid, userNum, max_credit, character_name, characterIdx, server</div>
+          <input type="file" id="fileInput" accept=".xlsx,.xls">
+        </div>
+        <div id="filePillWrap"></div>
+        <div id="uploadMsg"></div>
+        <div id="saveMsg"></div>
+        <div id="retrySaveWrap"></div>
+      </div>
+    </div>
+
+    <!-- ---- History tab ---- -->
+    <div id="historyPane" class="hidden">
+      <div class="card">
+        <h2>ประวัติการแปลงของทีม (เก็บ 14 วัน)</h2>
+        <div class="btn-row" style="margin-top:0;margin-bottom:12px;">
+          <button class="btn secondary small" id="refreshHistoryBtn">🔄 รีเฟรช</button>
+        </div>
+        <div id="historyMsg"></div>
+        <div id="historyListWrap"></div>
+      </div>
+    </div>
+
+    <!-- ---- Results (shared by both tabs) ---- -->
+    <div class="card hidden" id="resultsCard">
+      <h2>ผลลัพธ์</h2>
+      <div id="viewBanner"></div>
+      <div class="stats" id="statsRow"></div>
+      <div class="btn-row">
+        <button class="btn" id="copyRichBtn">📋 คัดลอกทั้งหมด (พร้อมสี ไปวางใน Google Sheets)</button>
+        <button class="btn secondary" id="copyTsvBtn">คัดลอกแบบข้อความล้วน (TSV)</button>
+        <button class="btn secondary" id="downloadCsvBtn">ดาวน์โหลด .csv</button>
+        <button class="btn secondary" id="downloadXlsxBtn">ดาวน์โหลด .xlsx</button>
+      </div>
+      <div id="copyMsg"></div>
+      <div class="legend" id="legendRow"></div>
+      <div id="tablesContainer" style="margin-top:20px;"></div>
+    </div>
+  </div>
+
+  <footer>Celestial Title Converter (Team) — ข้อมูลที่บันทึกจะถูกลบอัตโนมัติหลัง 14 วัน</footer>
+</div>
+
+<script>
+/* =====================================================================
+   CONFIG — ใส่ค่าจาก Supabase (Project Settings > API)
+   anon key ออกแบบให้ฝังในหน้าเว็บได้ ความปลอดภัยมาจาก RLS ในฐานข้อมูล
+   ===================================================================== */
+const SUPABASE_URL = "https://sbsftwzosrfnhdtitemr.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_hOEUywF8TlWTcPLW5OBzbQ_nLc1u8h-";
+const RETENTION_DAYS = 14;
+
+/* ---------------- Rank table ---------------- */
+const RANK_TABLE = [
+  { min: 0,       rank: "พลเรือน",        title: "-", color: null },
+  { min: 1000,    rank: "ทหาร",           title: "-", color: null },
+  { min: 5000,    rank: "ทหาร III",       title: "-", color: null },
+  { min: 10000,   rank: "หัวหน้า",         title: "Captian of Celestial",  color: "#0c769e" },
+  { min: 50000,   rank: "นายพล",          title: "General of Celestial",  color: "#00b050" },
+  { min: 100000,  rank: "ผู้บัญชาการ",     title: "Commander of Celestial",color: "#ff0d9a" },
+  { min: 300000,  rank: "ผู้กล้า",         title: "Hero of Celestial",     color: "#ff6d01" },
+  { min: 500000,  rank: "พระราชา",        title: "King of Celestial",     color: "#e0a800" },
+  { min: 700000,  rank: "จักรพรรดิ",      title: "Emperor of Celestial",  color: "#cc4125" },
+  { min: 1000000, rank: "เทพเจ้า",        title: "God of Celestial",      color: "#c00000" },
+  { min: 3000000, rank: "ผู้เป็นนิรันดร์", title: "Eternal of Celestial",  color: "#351c75" },
+];
+function getRank(value){
+  let result = RANK_TABLE[0];
+  for(const r of RANK_TABLE){ if(value >= r.min) result = r; else break; }
+  return result;
+}
+
+/* ---------------- Header detection ---------------- */
+const HEADER_ALIASES = {
+  player_id:      ["player_id","combo id","comboid"],
+  username:       ["username"],
+  aid:            ["aid"],
+  userNum:        ["usernum","est usernum"],
+  max_credit:     ["max_credit","maximum ark gem"],
+  character_name: ["character_name","character"],
+  server:         ["server"],
+  characterIdx:   ["characteridx","character id"],
+};
+function findCol(headers, aliases){
+  const norm = headers.map(h => String(h||"").trim().toLowerCase());
+  for(const a of aliases){ const idx = norm.indexOf(a); if(idx !== -1) return idx; }
+  return -1;
+}
+function parseWorkbook(wb){
+  const sheetName = wb.SheetNames.includes("Report") ? "Report" : wb.SheetNames[0];
+  const ws = wb.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:"" });
+  if(!rows.length) throw new Error("ไฟล์นี้ไม่มีข้อมูล");
+  const headers = rows[0];
+  const col = {};
+  for(const key in HEADER_ALIASES) col[key] = findCol(headers, HEADER_ALIASES[key]);
+  const missing = Object.keys(col).filter(k => col[k] === -1);
+  if(missing.length) throw new Error("ไม่พบคอลัมน์ที่ต้องใช้ในไฟล์: " + missing.join(", "));
+  col.gamePotId = findCol(headers, ["gamepotid","gamepot id","gamepot_id"]);
+  const dataRows = rows.slice(1).filter(r => r[col.player_id] !== "" && r[col.player_id] != null);
+  return { col, dataRows, sheetName };
+}
+function buildGroups(col, dataRows){
+  const groups = new Map();
+  let skipped = 0;
+  for(const r of dataRows){
+    const charName = r[col.character_name];
+    const charIdx = r[col.characterIdx];
+    const srv = r[col.server];
+    const isValid = charName !== "" && charName != null &&
+                    charIdx !== "" && charIdx != null &&
+                    srv !== "" && srv != null;
+    if(!isValid){ skipped++; continue; }
+    const pid = String(r[col.player_id]);
+    if(!groups.has(pid)){
+      groups.set(pid, {
+        player_id: pid,
+        gamePotId: col.gamePotId !== -1 ? r[col.gamePotId] : "",
+        username: r[col.username], aid: r[col.aid], userNum: r[col.userNum],
+        max_credit: parseFloat(r[col.max_credit]) || 0,
+        server: srv, characters: [],
+      });
+    }
+    groups.get(pid).characters.push({ character_name: charName, characterIdx: charIdx, server: srv });
+  }
+  const result = Array.from(groups.values()).filter(g => g.characters.length > 0);
+  return { groups: result, skipped };
+}
+function groupByServer(groups){
+  const bySrv = new Map();
+  for(const g of groups){
+    const s = g.server || "(ไม่ระบุ)";
+    if(!bySrv.has(s)) bySrv.set(s, []);
+    bySrv.get(s).push(g);
+  }
+  for(const [,arr] of bySrv) arr.sort((a,b) => b.max_credit - a.max_credit);
+  return bySrv;
+}
+// live Map (fresh convert) or JSON array of [server, combos[]] (loaded from database)
+function toEntries(bySrv){ return bySrv instanceof Map ? Array.from(bySrv.entries()) : bySrv; }
+
+/* ---------------- Helpers ---------------- */
+function $(id){ return document.getElementById(id); }
+function escapeHtml(s){
+  return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function fmtNum(n){ return Number(n).toLocaleString("en-US"); }
+function showMsg(el, type, text){ el.className = "msg " + type; el.textContent = text; el.style.display = "block"; }
+function clearMsg(el){ el.style.display = "none"; el.textContent = ""; }
+function fmtDateTH(isoDate){
+  try{
+    const [y,m,d] = String(isoDate).split("-").map(Number);
+    return new Date(y, m-1, d).toLocaleDateString("th-TH", { day:"numeric", month:"short", year:"numeric" });
+  }catch(e){ return String(isoDate); }
+}
+function fmtDateTime(iso){
+  try{ return new Date(iso).toLocaleString("th-TH", { dateStyle:"medium", timeStyle:"short" }); }
+  catch(e){ return String(iso); }
+}
+function daysLeft(createdIso){
+  const exp = new Date(createdIso).getTime() + RETENTION_DAYS*86400000;
+  return Math.max(0, Math.ceil((exp - Date.now())/86400000));
+}
+
+/* ---------------- Supabase / auth ---------------- */
+const configured = !SUPABASE_URL.startsWith("PASTE_") && !SUPABASE_ANON_KEY.startsWith("PASTE_");
+const sb = configured ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+function showView(name){
+  ["setupView","appView"].forEach(v => $(v).classList.add("hidden"));
+  $(name).classList.remove("hidden");
+}
+
+// ไม่มีการล็อกอิน: ใครเปิดลิงก์ก็ดู/แปลงไฟล์ได้เลย — ใส่ชื่อผู้ทำเป็นข้อมูลอ้างอิงเท่านั้น
+const LS_NAME = "celestial_uploader_name";
+try{ $("uploaderName").value = localStorage.getItem(LS_NAME) || ""; }catch(e){}
+$("uploaderName").addEventListener("change", () => {
+  try{ localStorage.setItem(LS_NAME, $("uploaderName").value.trim()); }catch(e){}
+});
+function getUploader(){ return $("uploaderName").value.trim() || "ไม่ระบุชื่อ"; }
+
+// ยังไม่ได้ใส่ค่า Supabase → โหมดทดลอง: เก็บประวัติในเบราว์เซอร์เครื่องนี้ (IndexedDB)
+const DEMO = !configured;
+if(DEMO) $("demoBanner").classList.remove("hidden");
+showView("appView");
+
+/* ---------------- Data layer: Supabase หรือ IndexedDB (โหมดทดลอง) ---------------- */
+function idbOpen(){
+  return new Promise((res, rej) => {
+    const r = indexedDB.open("celestial_demo", 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("runs", { keyPath: "id" });
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+async function idbAll(){
+  const db = await idbOpen();
+  return new Promise((res, rej) => {
+    const q = db.transaction("runs").objectStore("runs").getAll();
+    q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error);
+  });
+}
+async function idbPut(row){
+  const db = await idbOpen();
+  return new Promise((res, rej) => {
+    const tx = db.transaction("runs", "readwrite");
+    tx.objectStore("runs").put(row);
+    tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error);
+  });
+}
+async function idbDel(id){
+  const db = await idbOpen();
+  return new Promise((res, rej) => {
+    const tx = db.transaction("runs", "readwrite");
+    tx.objectStore("runs").delete(id);
+    tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error);
+  });
+}
+async function dbInsert(row){
+  if(!DEMO) return await sb.from("runs").insert(row);
+  try{
+    const id = "d" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    await idbPut({ ...row, id, created_at: new Date().toISOString() });
+    return { error: null };
+  }catch(e){ return { error: { message: String(e) } }; }
+}
+async function dbList(sinceIso){
+  if(!DEMO){
+    return await sb.from("runs")
+      .select("id,created_at,uploaded_by,file_name,preset,ma_date,note,servers,total_combo,total_chars,skipped")
+      .gte("created_at", sinceIso)
+      .order("ma_date", { ascending:false })
+      .order("created_at", { ascending:false })
+      .limit(300);
+  }
+  try{
+    const all = (await idbAll()).filter(r => r.created_at >= sinceIso);
+    all.sort((a,b) => (b.ma_date + b.created_at).localeCompare(a.ma_date + a.created_at));
+    return { data: all.map(({ data, ...meta }) => meta), error: null };
+  }catch(e){ return { data: null, error: { message: String(e) } }; }
+}
+async function dbGet(id){
+  if(!DEMO) return await sb.from("runs").select("data").eq("id", id).single();
+  try{
+    const r = (await idbAll()).find(x => x.id === id);
+    return r ? { data: { data: r.data }, error: null } : { data: null, error: { message: "ไม่พบข้อมูล" } };
+  }catch(e){ return { data: null, error: { message: String(e) } }; }
+}
+async function dbDelete(id){
+  if(!DEMO) return await sb.from("runs").delete().eq("id", id);
+  try{ await idbDel(id); return { error: null }; }catch(e){ return { error: { message: String(e) } }; }
+}
+
+/* ---------------- Tabs ---------------- */
+function switchTab(which){
+  const isConvert = which === "convert";
+  $("convertPane").classList.toggle("hidden", !isConvert);
+  $("historyPane").classList.toggle("hidden", isConvert);
+  $("tabConvert").classList.toggle("active", isConvert);
+  $("tabHistory").classList.toggle("active", !isConvert);
+  if(!isConvert) loadHistory();
+}
+$("tabConvert").addEventListener("click", () => switchTab("convert"));
+$("tabHistory").addEventListener("click", () => switchTab("history"));
+$("refreshHistoryBtn").addEventListener("click", loadHistory);
+
+/* ---------------- State / UI wiring ---------------- */
+let lastResult = null; // { bySrv, prefix }
+let pendingSave = null; // payload waiting to be saved (for retry)
+
+const regionPreset = $("regionPreset"), prefixInput = $("prefixInput"), maDate = $("maDate");
+const dropzone = $("dropzone"), fileInput = $("fileInput");
+const uploadMsg = $("uploadMsg"), saveMsg = $("saveMsg"), filePillWrap = $("filePillWrap");
+const resultsCard = $("resultsCard"), statsRow = $("statsRow"), tablesContainer = $("tablesContainer");
+const copyMsg = $("copyMsg"), legendRow = $("legendRow"), viewBanner = $("viewBanner");
+
+function updateDropzoneLock(){
+  const locked = !maDate.value;
+  dropzone.classList.toggle("locked", locked);
+}
+maDate.addEventListener("input", updateDropzoneLock);
+updateDropzoneLock();
+
+regionPreset.addEventListener("change", () => {
+  if(regionPreset.value === "custom"){ prefixInput.value = ""; prefixInput.focus(); }
+  else prefixInput.value = regionPreset.value;
+  if(lastResult) render(lastResult.bySrv, prefixInput.value);
+});
+prefixInput.addEventListener("input", () => { if(lastResult) render(lastResult.bySrv, prefixInput.value); });
+
+function guardDate(){
+  if(!maDate.value){
+    showMsg(uploadMsg, "warn", "กรุณาเลือกวันที่ MA ของรอบนี้ก่อนอัปโหลดไฟล์");
+    maDate.focus();
+    return false;
+  }
+  return true;
+}
+dropzone.addEventListener("click", () => { if(guardDate()) fileInput.click(); });
+dropzone.addEventListener("dragover", e => { e.preventDefault(); dropzone.classList.add("drag"); });
+dropzone.addEventListener("dragleave", () => dropzone.classList.remove("drag"));
+dropzone.addEventListener("drop", e => {
+  e.preventDefault(); dropzone.classList.remove("drag");
+  if(!guardDate()) return;
+  if(e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener("change", e => { if(e.target.files.length) handleFile(e.target.files[0]); });
+
+function handleFile(file){
+  clearMsg(uploadMsg); clearMsg(saveMsg); $("retrySaveWrap").innerHTML = "";
+  filePillWrap.innerHTML = `<span class="filepill">📎 ${escapeHtml(file.name)} <button id="clearFileBtn" title="ล้างไฟล์">✕</button></span>`;
+  $("clearFileBtn").addEventListener("click", () => {
+    filePillWrap.innerHTML = ""; fileInput.value = "";
+    resultsCard.classList.add("hidden"); lastResult = null; pendingSave = null;
+    clearMsg(saveMsg); $("retrySaveWrap").innerHTML = "";
+  });
+
+  const reader = new FileReader();
+  reader.onload = async evt => {
+    try{
+      const data = new Uint8Array(evt.target.result);
+      const wb = XLSX.read(data, { type:"array" });
+      const { col, dataRows, sheetName } = parseWorkbook(wb);
+      const { groups, skipped } = buildGroups(col, dataRows);
+      const bySrv = groupByServer(groups);
+
+      const fname = file.name.toLowerCase();
+      const serverNames = Array.from(bySrv.keys()).map(s => String(s).toLowerCase());
+      if(fname.includes("pcsea")){ regionPreset.value = "PC-SEA"; prefixInput.value = "PC-SEA"; }
+      else if(fname.includes("msea")){ regionPreset.value = "CBM-SEA"; prefixInput.value = "CBM-SEA"; }
+      else if(fname.includes("pcth")){ regionPreset.value = "CBPC-TH"; prefixInput.value = "CBPC-TH"; }
+      else if(fname.includes("mth")){ regionPreset.value = "CBM-TH"; prefixInput.value = "CBM-TH"; }
+      else if(serverNames.includes("orion")){ regionPreset.value = "CBPC-TH"; prefixInput.value = "CBPC-TH"; }
+      else if(serverNames.includes("serpens")){ regionPreset.value = "CBM-TH"; prefixInput.value = "CBM-TH"; }
+
+      lastResult = { bySrv };
+      viewBanner.innerHTML = "";
+      render(bySrv, prefixInput.value);
+
+      const skippedNote = skipped > 0 ? ` (ตัดแถวข้อมูลไม่สมบูรณ์ทิ้ง ${skipped} แถว)` : "";
+      showMsg(uploadMsg, "ok", `อ่านไฟล์สำเร็จ (ชีท "${sheetName}") — พบ ${dataRows.length} แถวตัวละคร${skippedNote}, จัดกลุ่มได้ ${groups.length} Combo, ${bySrv.size} เซิร์ฟเวอร์`);
+
+      pendingSave = {
+        file_name: file.name,
+        preset: prefixInput.value,
+        ma_date: maDate.value,
+        note: $("noteInput").value.trim() || null,
+        servers: Array.from(bySrv.keys()).join(", "),
+        total_combo: groups.length,
+        total_chars: dataRows.length - skipped,
+        skipped,
+        data: toEntries(bySrv),
+      };
+      await savePending();
+    }catch(err){
+      console.error(err);
+      showMsg(uploadMsg, "error", "อ่านไฟล์ไม่สำเร็จ: " + err.message);
+      resultsCard.classList.add("hidden");
+    }
+  };
+  reader.onerror = () => showMsg(uploadMsg, "error", "ไม่สามารถอ่านไฟล์นี้ได้");
+  reader.readAsArrayBuffer(file);
+}
+
+async function savePending(){
+  if(!pendingSave) return;
+  $("retrySaveWrap").innerHTML = "";
+  showMsg(saveMsg, "warn", "กำลังบันทึกลงประวัติของทีม...");
+  // keep the saved preset in sync with what the user finally sees in the prefix box
+  pendingSave.preset = prefixInput.value;
+  const row = { ...pendingSave, uploaded_by: getUploader() };
+  const { error } = await dbInsert(row);
+  if(error){
+    console.error(error);
+    showMsg(saveMsg, "error", "บันทึกลงประวัติไม่สำเร็จ: " + error.message + " (ผลลัพธ์ยังใช้งานได้ตามปกติ)");
+    $("retrySaveWrap").innerHTML = `<div class="btn-row"><button class="btn secondary small" id="retrySaveBtn">ลองบันทึกอีกครั้ง</button></div>`;
+    $("retrySaveBtn").addEventListener("click", savePending);
+    return;
+  }
+  pendingSave = null;
+  showMsg(saveMsg, "ok", "บันทึกลงประวัติของทีมแล้ว — เพื่อนร่วมทีมเปิดดูได้ที่แท็บ \"ประวัติของทีม\" (เก็บ " + RETENTION_DAYS + " วัน)");
+}
+
+/* ---------------- History ---------------- */
+async function loadHistory(){
+  const wrap = $("historyListWrap"), msg = $("historyMsg");
+  clearMsg(msg);
+  wrap.innerHTML = `<div class="history-empty">กำลังโหลด...</div>`;
+  const since = new Date(Date.now() - RETENTION_DAYS*86400000).toISOString();
+  const { data, error } = await dbList(since);
+  if(error){ wrap.innerHTML = ""; showMsg(msg, "error", "โหลดประวัติไม่สำเร็จ: " + error.message); return; }
+  if(!data.length){ wrap.innerHTML = `<div class="history-empty">ยังไม่มีข้อมูล — ลองแปลงไฟล์แรกที่แท็บ "แปลงไฟล์ใหม่"</div>`; return; }
+
+  wrap.innerHTML = "";
+  data.forEach(item => {
+    const row = document.createElement("div");
+    row.className = "history-item";
+    row.innerHTML = `
+      <div class="meta">
+        <div><span class="badge">MA ${escapeHtml(fmtDateTH(item.ma_date))}</span><b>[${escapeHtml(item.preset)}]</b> ${escapeHtml(item.servers || "")}</div>
+        <div class="sub">${escapeHtml(item.file_name)}${item.note ? " • " + escapeHtml(item.note) : ""}</div>
+        <div class="sub">อัปโหลดโดย ${escapeHtml(item.uploaded_by)} เมื่อ ${escapeHtml(fmtDateTime(item.created_at))} • ${item.total_combo} Combo / ${item.total_chars} แถว • หมดอายุในอีก ${daysLeft(item.created_at)} วัน</div>
+      </div>
+      <div class="actions">
+        <button class="btn small" data-act="view">ดูผลลัพธ์</button>
+      </div>`;
+    row.querySelector('[data-act="view"]').addEventListener("click", () => viewRun(item));
+    wrap.appendChild(row);
+  });
+}
+
+async function viewRun(item){
+  const msg = $("historyMsg");
+  showMsg(msg, "warn", "กำลังโหลดผลลัพธ์...");
+  const { data, error } = await dbGet(item.id);
+  if(error || !data || !Array.isArray(data.data)){
+    showMsg(msg, "error", "โหลดผลลัพธ์ไม่สำเร็จ: " + (error ? error.message : "ไม่พบข้อมูล (อาจถูกลบไปแล้ว)"));
+    return;
+  }
+  clearMsg(msg);
+  lastResult = { bySrv: data.data };
+  regionPreset.value = ["PC-SEA","CBM-SEA","CBPC-TH","CBM-TH"].includes(item.preset) ? item.preset : "custom";
+  prefixInput.value = item.preset;
+  render(data.data, item.preset);
+  viewBanner.innerHTML = `<div class="history-banner">
+    <span>📜 กำลังดูข้อมูลย้อนหลัง: <b>[${escapeHtml(item.preset)}]</b> ${escapeHtml(item.servers || "")} • <b>MA ${escapeHtml(fmtDateTH(item.ma_date))}</b>${item.note ? " • " + escapeHtml(item.note) : ""}
+    <br><small>ไฟล์ ${escapeHtml(item.file_name)} โดย ${escapeHtml(item.uploaded_by)} เมื่อ ${escapeHtml(fmtDateTime(item.created_at))}</small></span>
+    <button class="btn secondary small" id="closeViewBtn">✕ ปิด</button>
+  </div>`;
+  $("closeViewBtn").addEventListener("click", () => {
+    viewBanner.innerHTML = ""; resultsCard.classList.add("hidden"); lastResult = null;
+  });
+  resultsCard.scrollIntoView({ behavior:"smooth", block:"start" });
+}
+
+/* ---------------- Rendering ---------------- */
+const OUT_HEADERS_STANDARD = ["Combo ID","Username","AID","EST Usernum","Character","Character id","server","Maximum Ark Gem","Rank","title"];
+const OUT_HEADERS_CBMTH = ["Combo ID","Gamepot ID","Username","AID","EST Usernum","Character","Character id","server","Maximum Ark Gem","Rank","title"];
+function useGamepotCol(prefix){ return String(prefix||"").trim().toUpperCase() === "CBM-TH"; }
+function getHeaders(prefix){ return useGamepotCol(prefix) ? OUT_HEADERS_CBMTH : OUT_HEADERS_STANDARD; }
+
+function render(bySrv, prefix){
+  clearMsg(copyMsg);
+  resultsCard.classList.remove("hidden");
+  const entries = toEntries(bySrv);
+
+  let totalCombos = 0, totalChars = 0;
+  const rankDist = {};
+  for(const [,arr] of entries){
+    totalCombos += arr.length;
+    arr.forEach(g => {
+      totalChars += g.characters.length;
+      const r = getRank(g.max_credit).rank;
+      rankDist[r] = (rankDist[r]||0)+1;
+    });
+  }
+  statsRow.innerHTML = `
+    <div class="stat"><div class="n">${entries.length}</div><div class="l">เซิร์ฟเวอร์</div></div>
+    <div class="stat"><div class="n">${totalCombos}</div><div class="l">Combo (ผู้เล่น)</div></div>
+    <div class="stat"><div class="n">${totalChars}</div><div class="l">แถวตัวละครทั้งหมด</div></div>`;
+
+  legendRow.innerHTML = "";
+  RANK_TABLE.slice().reverse().forEach(r => {
+    if(rankDist[r.rank]){
+      legendRow.innerHTML += `<span><i style="background:${r.color || "#e2e8f0"}"></i>${r.rank} (${r.title})</span>`;
+    }
+  });
+
+  const headers = getHeaders(prefix);
+  const gamepot = useGamepotCol(prefix);
+  const accentStart = headers.length - 3;
+  tablesContainer.innerHTML = "";
+  for(const [srv, arr] of entries){
+    const title = `[${prefix || "PREFIX"}] SV. ${srv}`;
+    const block = document.createElement("div");
+    block.className = "server-block";
+    let rowsHtml = "";
+    arr.forEach(g => {
+      const r = getRank(g.max_credit);
+      g.characters.forEach(c => {
+        const gamepotCell = gamepot ? `<td class="plain">${escapeHtml(g.gamePotId)}</td>` : "";
+        rowsHtml += `<tr>
+          <td class="plain">${escapeHtml(g.player_id)}</td>
+          ${gamepotCell}
+          <td class="plain">${escapeHtml(g.username)}</td>
+          <td class="plain">${escapeHtml(g.aid)}</td>
+          <td class="plain">${escapeHtml(g.userNum)}</td>
+          <td class="plain">${escapeHtml(c.character_name)}</td>
+          <td class="plain">${escapeHtml(c.characterIdx)}</td>
+          <td class="plain">${escapeHtml(c.server)}</td>
+          <td class="plain">${fmtNum(g.max_credit)}</td>
+          <td class="rank-cell" style="background:${r.color || "#ffffff"};color:${r.color? "#fff":"#0f172a"}">${escapeHtml(r.rank)}</td>
+          <td class="title-cell" style="background:${r.color || "#ffffff"};color:${r.color? "#fff":"#0f172a"}">${escapeHtml(r.title)}</td>
+        </tr>`;
+      });
+    });
+    block.innerHTML = `<table class="out" data-server="${escapeHtml(srv)}">
+      <caption></caption>
+      <thead>
+        <tr class="title-row"><th colspan="${headers.length}">${escapeHtml(title)}</th></tr>
+        <tr class="col-row">${headers.map((h,i) => `<th class="${i>=accentStart?'accent':''}">${h}</th>`).join("")}</tr>
+      </thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>`;
+    tablesContainer.appendChild(block);
+  }
+}
+
+/* ---------------- Export helpers ---------------- */
+function buildTSV(bySrv, prefix){
+  const headers = getHeaders(prefix);
+  const gamepot = useGamepotCol(prefix);
+  let out = "";
+  for(const [srv, arr] of toEntries(bySrv)){
+    out += `[${prefix||"PREFIX"}] SV. ${srv}\n`;
+    out += headers.join("\t") + "\n";
+    arr.forEach(g => {
+      const r = getRank(g.max_credit);
+      g.characters.forEach(c => {
+        const row = [g.player_id];
+        if(gamepot) row.push(g.gamePotId);
+        row.push(g.username,g.aid,g.userNum,c.character_name,c.characterIdx,c.server,g.max_credit,r.rank,r.title);
+        out += row.join("\t") + "\n";
+      });
+    });
+    out += "\n";
+  }
+  return out;
+}
+$("copyTsvBtn").addEventListener("click", async () => {
+  if(!lastResult) return;
+  try{
+    await navigator.clipboard.writeText(buildTSV(lastResult.bySrv, prefixInput.value));
+    showMsg(copyMsg,"ok","คัดลอกแบบข้อความล้วน (TSV) แล้ว — วางใน Google Sheets ได้เลย");
+  }catch(e){ showMsg(copyMsg,"error","คัดลอกไม่สำเร็จ: " + e.message); }
+});
+$("copyRichBtn").addEventListener("click", async () => {
+  if(!lastResult) return;
+  const tsv = buildTSV(lastResult.bySrv, prefixInput.value);
+  try{
+    if(window.ClipboardItem){
+      const blobHtml = new Blob([`<table>${extractAllTables()}</table>`], {type:"text/html"});
+      const blobText = new Blob([tsv], {type:"text/plain"});
+      await navigator.clipboard.write([ new ClipboardItem({ "text/html": blobHtml, "text/plain": blobText }) ]);
+      showMsg(copyMsg,"ok","คัดลอกพร้อมสีแล้ว — ไปวาง (Ctrl+V) ในเซลล์ A1 ของ Google Sheets ได้เลย");
+    } else {
+      await navigator.clipboard.writeText(tsv);
+      showMsg(copyMsg,"warn","เบราว์เซอร์นี้ไม่รองรับการคัดลอกพร้อมสี จึงคัดลอกเป็นข้อความล้วนแทน");
+    }
+  }catch(e){ showMsg(copyMsg,"error","คัดลอกไม่สำเร็จ: " + e.message); }
+});
+function extractAllTables(){
+  let rowsHtml = "";
+  tablesContainer.querySelectorAll("table.out").forEach(t => {
+    const colCount = t.querySelectorAll("thead .col-row th").length;
+    rowsHtml += t.querySelector("thead .title-row").outerHTML;
+    rowsHtml += t.querySelector("thead .col-row").outerHTML;
+    rowsHtml += t.querySelector("tbody").innerHTML;
+    rowsHtml += `<tr><td colspan="${colCount}" style="border:none;height:14px;"></td></tr>`;
+  });
+  return rowsHtml;
+}
+$("downloadCsvBtn").addEventListener("click", () => {
+  if(!lastResult) return;
+  const tsv = buildTSV(lastResult.bySrv, prefixInput.value);
+  const csv = tsv.split("\n").map(line => {
+    if(line === "") return "";
+    return line.split("\t").map(f => /[",\n]/.test(f) ? `"${f.replace(/"/g,'""')}"` : f).join(",");
+  }).join("\n");
+  downloadBlob(csv, "celestial-title-output.csv", "text/csv;charset=utf-8;");
+});
+$("downloadXlsxBtn").addEventListener("click", () => {
+  if(!lastResult) return;
+  const prefix = prefixInput.value;
+  const headers = getHeaders(prefix);
+  const gamepot = useGamepotCol(prefix);
+  const wb = XLSX.utils.book_new();
+  for(const [srv, arr] of toEntries(lastResult.bySrv)){
+    const aoa = [[`[${prefix||"PREFIX"}] SV. ${srv}`], headers];
+    arr.forEach(g => {
+      const r = getRank(g.max_credit);
+      g.characters.forEach(c => {
+        const row = [g.player_id];
+        if(gamepot) row.push(g.gamePotId);
+        row.push(g.username,g.aid,g.userNum,c.character_name,c.characterIdx,c.server,g.max_credit,r.rank,r.title);
+        aoa.push(row);
+      });
+    });
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    const safeName = String(srv).substring(0,28).replace(/[\\/?*\[\]:]/g,"_") || "Sheet";
+    XLSX.utils.book_append_sheet(wb, ws, safeName);
+  }
+  XLSX.writeFile(wb, "celestial-title-output.xlsx");
+});
+function downloadBlob(content, filename, mime){
+  const blob = new Blob([content], {type:mime});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+</script>
+</body>
+</html>
