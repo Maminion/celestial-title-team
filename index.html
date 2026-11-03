@@ -6,6 +6,7 @@
 <title>Celestial Title Converter (Team)</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
   :root{
     --teal:#134f5c; --gold:#ffd966; --panel:#ffffff; --muted:#64748b; --border:#e2e8f0;
@@ -196,7 +197,7 @@
         <button class="btn secondary" id="copyTsvBtn">คัดลอกแบบข้อความล้วน (TSV)</button>
         <button class="btn secondary" id="downloadCsvBtn">ดาวน์โหลด .csv</button>
         <button class="btn secondary" id="downloadXlsxBtn">ดาวน์โหลด .xlsx</button>
-        <button class="btn secondary" id="downloadTxtBtn">ดาวน์โหลด .txt</button>
+        <button class="btn secondary" id="downloadTxtBtn">ดาวน์โหลดไฟล์ TXT แบบแยกยศ</button>
       </div>
       <div id="copyMsg"></div>
       <div class="legend" id="legendRow"></div>
@@ -498,7 +499,7 @@ function handleFile(file){
       else if(serverNames.includes("orion")){ regionPreset.value = "CBPC-TH"; prefixInput.value = "CBPC-TH"; }
       else if(serverNames.includes("serpens")){ regionPreset.value = "CBM-TH"; prefixInput.value = "CBM-TH"; }
 
-      lastResult = { bySrv };
+      lastResult = { bySrv, maDate: maDate.value };
       viewBanner.innerHTML = "";
       render(bySrv, prefixInput.value);
 
@@ -583,7 +584,7 @@ async function viewRun(item){
     return;
   }
   clearMsg(msg);
-  lastResult = { bySrv: data.data };
+  lastResult = { bySrv: data.data, maDate: item.ma_date };
   regionPreset.value = ["PC-SEA","CBM-SEA","CBPC-TH","CBM-TH"].includes(item.preset) ? item.preset : "custom";
   prefixInput.value = item.preset;
   render(data.data, item.preset);
@@ -734,10 +735,45 @@ $("downloadCsvBtn").addEventListener("click", () => {
   }).join("\n");
   downloadBlob(csv, "celestial-title-output.csv", "text/csv;charset=utf-8;");
 });
-$("downloadTxtBtn").addEventListener("click", () => {
+// ชื่อสั้นของเซิร์ฟเวอร์สำหรับชื่อโฟลเดอร์/ไฟล์ Zip
+const SHORT_NAME = { "PC-SEA":"PCSEA", "CBM-SEA":"MSEA", "CBPC-TH":"PCTH", "CBM-TH":"MTH" };
+function fmtDMY(isoDate){
+  const m = String(isoDate || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}.${m[2]}.${m[1]}` : "";
+}
+$("downloadTxtBtn").addEventListener("click", async () => {
   if(!lastResult) return;
-  // ข้อความคั่นด้วยแท็บ (วางใน Google Sheets ได้) + BOM ให้ Notepad อ่านภาษาไทยถูก
-  downloadBlob("﻿" + buildTSV(lastResult.bySrv, prefixInput.value), "celestial-title-output.txt", "text/plain;charset=utf-8;");
+  if(!window.JSZip){ showMsg(copyMsg, "error", "โหลดตัวสร้างไฟล์ Zip ไม่สำเร็จ (ตรวจสอบอินเทอร์เน็ต แล้วรีเฟรชหน้า)"); return; }
+  // เฉพาะยศที่มีสี (Eternal → Captian) เรียงจากสูงไปต่ำ เป็นเลข 01..07
+  const tiers = RANK_TABLE.filter(r => r.color).slice().reverse();
+  const buckets = tiers.map(() => []);
+  for(const [, arr] of toEntries(lastResult.bySrv)){
+    arr.forEach(g => {
+      const idx = tiers.findIndex(t => t.rank === getRank(g.max_credit).rank);
+      if(idx === -1) return;
+      g.characters.forEach(c => buckets[idx].push(String(c.characterIdx)));
+    });
+  }
+  const prefix = prefixInput.value.trim();
+  const shortName = SHORT_NAME[prefix.toUpperCase()] || prefix || "Celestial";
+  const dateStr = fmtDMY(lastResult.maDate || maDate.value);
+  const folder = `Celestial Title  ${shortName}${dateStr ? " " + dateStr : ""}`;
+  const zip = new JSZip();
+  const dir = zip.folder(folder);
+  let files = 0;
+  tiers.forEach((t, i) => {
+    if(!buckets[i].length) return; // ยศที่ไม่มีตัวละครไม่สร้างไฟล์
+    dir.file(`${String(i + 1).padStart(2, "0")}${t.title}.txt`, buckets[i].join("\r\n"));
+    files++;
+  });
+  if(!files){ showMsg(copyMsg, "warn", "ไม่มีตัวละครในยศที่มีสี จึงไม่มีไฟล์ให้สร้าง"); return; }
+  const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = folder + ".zip";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showMsg(copyMsg, "ok", `ดาวน์โหลด ${folder}.zip แล้ว (${files} ไฟล์ แยกตามยศ)`);
 });
 $("downloadXlsxBtn").addEventListener("click", () => {
   if(!lastResult) return;
