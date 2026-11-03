@@ -763,7 +763,7 @@ $("downloadTxtBtn").addEventListener("click", async () => {
   let files = 0;
   tiers.forEach((t, i) => {
     if(!buckets[i].length) return; // ยศที่ไม่มีตัวละครไม่สร้างไฟล์
-    dir.file(`${String(i + 1).padStart(2, "0")}${t.title}.txt`, buckets[i].join("\r\n"));
+    dir.file(`${String(i <= 2 ? i + 1 : i).padStart(2, "0")}${t.title}.txt`, buckets[i].join("\r\n"));
     files++;
   });
   if(!files){ showMsg(copyMsg, "warn", "ไม่มีตัวละครในยศที่มีสี จึงไม่มีไฟล์ให้สร้าง"); return; }
