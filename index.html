@@ -196,6 +196,7 @@
         <button class="btn secondary" id="copyTsvBtn">คัดลอกแบบข้อความล้วน (TSV)</button>
         <button class="btn secondary" id="downloadCsvBtn">ดาวน์โหลด .csv</button>
         <button class="btn secondary" id="downloadXlsxBtn">ดาวน์โหลด .xlsx</button>
+        <button class="btn secondary" id="downloadTxtBtn">ดาวน์โหลด .txt</button>
       </div>
       <div id="copyMsg"></div>
       <div class="legend" id="legendRow"></div>
@@ -732,6 +733,11 @@ $("downloadCsvBtn").addEventListener("click", () => {
     return line.split("\t").map(f => /[",\n]/.test(f) ? `"${f.replace(/"/g,'""')}"` : f).join(",");
   }).join("\n");
   downloadBlob(csv, "celestial-title-output.csv", "text/csv;charset=utf-8;");
+});
+$("downloadTxtBtn").addEventListener("click", () => {
+  if(!lastResult) return;
+  // ข้อความคั่นด้วยแท็บ (วางใน Google Sheets ได้) + BOM ให้ Notepad อ่านภาษาไทยถูก
+  downloadBlob("﻿" + buildTSV(lastResult.bySrv, prefixInput.value), "celestial-title-output.txt", "text/plain;charset=utf-8;");
 });
 $("downloadXlsxBtn").addEventListener("click", () => {
   if(!lastResult) return;
